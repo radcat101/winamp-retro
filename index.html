@@ -97,7 +97,7 @@ body.mini #app{max-width:460px}
 <section class="win" id="wMain">
  <div class="tbar">
   <select id="selTheme" title="Skin"><option value="plata">Plata 2000</option><option value="clasico">Clásico</option><option value="fosforo">Fósforo</option><option value="cfe">CFE</option></select>
-  <span class="t">WINAMP · RETRO</span>
+  <span class="t" id="appName" title="Toca para cambiar el nombre" style="cursor:pointer">WINAMP · RETRO</span>
   <button id="bPip" class="hidden" title="Ventana flotante siempre encima">📌</button>
   <button id="bMini" title="Modo mini">▭</button>
  </div>
@@ -732,9 +732,11 @@ function onKey(e){
 document.addEventListener('keydown',onKey);
 window.addEventListener('pagehide',()=>{if(curId)S.pos[curId]=deck().el.currentTime;try{localStorage.setItem('wr-state',JSON.stringify(S))}catch(e){}});
 
+function applyName(){const n=(S.name||'Winamp Retro').trim();document.getElementById('appName').textContent=n.toUpperCase().split(' ').join(' · ');document.title=n}
+document.getElementById('appName').onclick=()=>{const n=prompt('Nombre del reproductor:',S.name||'Winamp Retro');if(n===null)return;S.name=n.trim().slice(0,30)||'Winamp Retro';applyName();save()};
 /* ---------- Arranque ---------- */
 (async()=>{
- document.body.dataset.theme=S.theme;E.selTheme.value=S.theme;readColors();
+ document.body.dataset.theme=S.theme;E.selTheme.value=S.theme;readColors();applyName();
  document.body.classList.toggle('mini',S.mini);
  E.vol.value=S.vol;E.bal.value=S.bal;E.speed.value=Math.round(S.speed*100);E.speedV.textContent=S.speed.toFixed(2)+'×';E.cf.value=S.cf;E.cfV.textContent=S.cf+' s';E.pitch.checked=S.pitch;
  setShuf(S.shuffle);E.bRep.textContent=repTxt[S.repeat];E.bRep.classList.toggle('on',S.repeat!=='off');
