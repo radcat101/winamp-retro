@@ -177,7 +177,7 @@ body.mini #app{max-width:460px}
  <div class="body">
   <div class="row"><input class="inp grow" id="rq" type="search" placeholder="Busca estación, ciudad o género (cumbia, noticias…)"><button class="btn sm" id="rGo">🔍</button></div>
   <div class="row">
-   <button class="btn sm" id="rMx">🇲🇽 México</button><button class="btn sm" id="rNear">📍 Cerca de mí</button><button class="btn sm" id="rTop">🔥 Mundo</button><button class="btn sm" id="rRnd">🎲 Aleatoria</button><button class="btn sm" id="rFav">⭐ Favoritas</button>
+   <button class="btn sm" id="rMx">🇲🇽 México</button><button class="btn sm" id="rNear">📍 Cerca de mí</button><button class="btn sm" id="rTop">🔥 Mundo</button><button class="btn sm" id="rRnd">🎲 Aleatoria</button><button class="btn sm" id="rFav">⭐ Favoritas</button><button class="btn sm" id="rUrl">🔗 Enlace</button>
   </div>
   <div id="map"></div>
   <div class="foot" id="rInfo">Toca un punto del mapa para escuchar.</div>
@@ -643,7 +643,8 @@ $('#bEject').onclick=$('#bAdd').onclick=()=>$('#fIn').click();$('#bAddDir').oncl
 $('#fIn').onchange=e=>{addFiles(e.target.files);e.target.value=''};$('#dIn').onchange=e=>{addFiles(e.target.files);e.target.value=''};
 $('#bLrc').onclick=()=>{if(!curT())return alert('Primero reproduce una canción.');$('#lIn').click()};
 $('#lIn').onchange=async e=>{const f=e.target.files[0];e.target.value='';const t=curT();if(!f||!t)return;t.lrc=parseLrc(await f.text());dbPut(t);renderLrc(t);renderPl()};
-$('#bRadio').onclick=()=>{const u=prompt('Pega el enlace del stream de radio (MP3/AAC/M3U8):','https://');if(u&&/^https?:\/\/.+/.test(u))playRadio(u.trim())};
+$('#bRadio').onclick=()=>{const b=document.querySelector('[data-w="wRadio"]');if(document.getElementById('wRadio').classList.contains('hidden'))b.click();document.getElementById('wRadio').scrollIntoView({behavior:'smooth'})};
+document.getElementById('rUrl').onclick=()=>{const u=prompt('Pega el enlace del stream de radio (MP3/AAC/M3U8):','https://');if(u&&/^https?:\/\/.+/.test(u))playRadio(u.trim())};
 E.seek.oninput=()=>{seeking=true};E.seek.onchange=()=>{const a=deck().el;if(isFinite(a.duration))a.currentTime=E.seek.value/1000*a.duration;seeking=false};
 E.time.onclick=()=>{S.remain=!S.remain;save()};E.viz.onclick=()=>{S.viz=(S.viz+1)%3;save()};
 E.vol.oninput=()=>{S.vol=+E.vol.value;applyVol();save()};E.bal.oninput=()=>{S.bal=+E.bal.value;applyVol();save()};E.bal.ondblclick=()=>{E.bal.value=0;E.bal.oninput()};
