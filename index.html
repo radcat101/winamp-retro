@@ -170,7 +170,7 @@ body.mini #app{max-width:460px}
 <section class="win xm" id="wPl">
  <div class="tbar"><span class="t">PLAYLIST</span></div>
  <div class="body">
-  <div class="row"><button class="btn sm" id="bAdd">＋ Archivos</button><button class="btn sm" id="bAddDir">📁 Carpeta</button><button class="btn sm" id="bRadio">📻 Radio</button><button class="btn sm" id="bClear">🗑 Vaciar</button></div>
+  <div class="row"><button class="btn sm" id="bAdd">＋ Archivos</button><button class="btn sm" id="bAddDir">📁 Carpeta</button><button class="btn sm" id="bRadio">📻 Radio</button><button class="btn sm" id="b79">📢 Radio 79</button><button class="btn sm hidden" id="bMine">🎵 Mi música</button><button class="btn sm" id="bClear">🗑 Vaciar</button></div>
   <div class="row"><input class="inp grow" id="search" type="search" placeholder="Buscar…"><select id="selList"><option value="">Listas guardadas…</option></select><button class="btn sm" id="bSaveList" title="Guardar lista">💾</button><button class="btn sm" id="bDelList" title="Borrar lista">🗑</button></div>
   <ul class="pl" id="pl"></ul>
   <div class="foot" id="plFoot"></div>
@@ -189,7 +189,7 @@ body.mini #app{max-width:460px}
  <div class="body">
   <div class="row"><input class="inp grow" id="rq" type="search" placeholder="Busca estación, ciudad o género (cumbia, noticias…)"><button class="btn sm" id="rGo">🔍</button></div>
   <div class="row">
-   <button class="btn sm" id="rMx">🇲🇽 México</button><button class="btn sm" id="rNear">📍 Cerca de mí</button><button class="btn sm" id="rTop">🔥 Mundo</button><button class="btn sm" id="rRnd">🎲 Aleatoria</button><button class="btn sm" id="rFav">⭐ Favoritas</button><button class="btn sm" id="rUrl">🔗 Enlace</button><button class="btn sm" id="rRec">⏺ Grabar</button>
+   <button class="btn sm" id="rMx">🇲🇽 México</button><button class="btn sm" id="rNear">📍 Cerca de mí</button><button class="btn sm" id="rTop">🔥 Mundo</button><button class="btn sm" id="rRnd">🎲 Aleatoria</button><button class="btn sm" id="r79">📢 Radio 79</button><button class="btn sm" id="rFav">⭐ Favoritas</button><button class="btn sm" id="rUrl">🔗 Enlace</button><button class="btn sm" id="rRec">⏺ Grabar</button>
   </div>
   <div id="map"></div>
   <div class="foot" id="rInfo">Toca un punto del mapa para escuchar.</div>
@@ -248,7 +248,7 @@ let saveT; const save=()=>{clearTimeout(saveT);saveT=setTimeout(()=>{try{localSt
 let db=null;
 const openDB=()=>new Promise((res,rej)=>{const r=indexedDB.open('winamp-retro',1);r.onupgradeneeded=()=>r.result.createObjectStore('tracks',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 const store=m=>db.transaction('tracks',m).objectStore('tracks');
-function dbPut(t){if(!db)return;const {url,coverUrl,...rest}=t;try{store('readwrite').put(rest)}catch(e){console.warn(e)}}
+function dbPut(t){if(!db||t.remote)return;const {url,coverUrl,...rest}=t;try{store('readwrite').put(rest)}catch(e){console.warn(e)}}
 function dbDel(id){if(db)try{store('readwrite').delete(id)}catch(e){}}
 const dbAll=()=>new Promise(res=>{try{const r=store('readonly').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>res([])}catch(e){res([])}});
 
@@ -372,7 +372,7 @@ async function addFiles(files){
  renderPl();
 }
 function probe(t){return new Promise(res=>{if(t.dur)return res();const a=new Audio();a.preload='metadata';a.onloadedmetadata=()=>{setDur(t,a.duration);res()};a.onerror=()=>res();a.src=url(t)})}
-function setDur(t,d){if(!d||!isFinite(d))return;t.dur=d;t.kbps=Math.round(t.blob.size*8/d/1000);dbPut(t)}
+function setDur(t,d){if(!d||!isFinite(d))return;t.dur=d;if(t.blob)t.kbps=Math.round(t.blob.size*8/d/1000);dbPut(t)}
 
 function renderPl(){
  const q=E.search.value.toLowerCase(),ul=E.pl;ul.innerHTML='';let tot=0;
@@ -387,10 +387,10 @@ function renderPl(){
  E.plFoot.textContent=`${tracks.length} canciones · ${fmt(tot)}${radioOn?' · 📻 radio en vivo':''}`;
  renderStats();renderVit();
 }
-function move(a,b){if(b<0||b>=tracks.length||a===b)return;const[t]=tracks.splice(a,1);tracks.splice(b,0,t);S.order=tracks.map(x=>x.id);save();renderPl()}
+function move(a,b){if(b<0||b>=tracks.length||a===b)return;const[t]=tracks.splice(a,1);tracks.splice(b,0,t);if(!in79)S.order=tracks.map(x=>x.id);save();renderPl()}
 function inAnyList(id){return Object.values(S.lists).some(l=>l.includes(id))}
 function removeAt(i){
- const t=tracks[i];if(!t)return;
+ const t=tracks[i];if(!t)return;if(t.remote){tracks.splice(i,1);renderPl();return}
  if(t.id===curId){stop();curId=null;S.cur=null}
  tracks.splice(i,1);S.order=tracks.map(x=>x.id);
  if(!inAnyList(t.id)){dbDel(t.id);if(t.url)URL.revokeObjectURL(t.url);if(t.coverUrl)URL.revokeObjectURL(t.coverUrl);delete lib[t.id]}
@@ -442,7 +442,7 @@ async function play(i,o={}){
   try{await A.el.play()}catch(e){console.warn(e)}
  }
  if(curId!==t.id){if(curId)hist.push(curId);S.plays[t.id]=(S.plays[t.id]||0)+1;abA=abB=null}
- curId=t.id;S.cur=t.id;showTrack(t);renderPl();save();
+ curId=t.id;if(!t.remote)S.cur=t.id;showTrack(t);renderPl();save();
 }
 function nextIndex(){
  const n=tracks.length;if(!n)return -1;const i=ci();
@@ -843,6 +843,31 @@ $id('rRec').onclick=async()=>{
  }catch(x){radioMsg('⚠️ Esta estación no permite grabar desde el navegador. Prueba con otra.')}
  rec=null;b.classList.remove('on');b.textContent='⏺ Grabar';
 };
+
+/* ---------- Radio SUTERM 79 (audios de la carpeta radio79 del repo) ---------- */
+let in79=false;
+async function load79(){
+ try{
+  radioMsg&&radioMsg('Cargando Radio 79…');
+  const r=await fetch('https://api.github.com/repos/radcat101/winamp-retro/contents/radio79?t='+Date.now());if(!r.ok)throw 0;
+  const files=(await r.json()).filter(f=>f.type==='file'&&/\.(mp3|m4a|aac|wav|ogg)$/i.test(f.name)).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  if(!files.length){alert('Radio 79 todavía no tiene audios. Súbelos a la carpeta radio79 del repositorio.');return}
+  stopRadio();in79=true;
+  tracks=files.map(f=>({id:'r79:'+f.sha,name:f.name,remote:true,url:location.protocol==='https:'&&location.hostname.endsWith('github.io')?'radio79/'+encodeURIComponent(f.name):f.download_url,title:f.name.replace(/\.[^.]+$/,'').replace(/^\d+[\s._-]+/,''),artist:'Radio SUTERM 79',album:'Radio SUTERM 79'}));
+  tracks.forEach(t=>lib[t.id]=t);
+  document.getElementById('bMine').classList.remove('hidden');
+  if(S.theme!=='suterm'){S.themeBefore79=S.theme;S.theme='suterm';E.selTheme.value='suterm';applyTheme()}
+  const pl=document.getElementById('wPl');if(pl.classList.contains('hidden'))document.querySelector('[data-w="wPl"]').click();
+  renderPl();play(0);tracks.forEach(t=>probe(t).then(renderPl));
+ }catch(x){alert('No se pudo cargar Radio 79. Revisa tu internet.')}
+}
+function backToMine(){
+ in79=false;stop();tracks=S.order.map(id=>lib[id]).filter(t=>t&&!t.remote);curId=null;
+ document.getElementById('bMine').classList.add('hidden');
+ if(S.themeBefore79){S.theme=S.themeBefore79;S.themeBefore79=null;E.selTheme.value=S.theme;applyTheme();save()}
+ renderPl();setTitle('*** TU MÚSICA ***');
+}
+document.getElementById('b79').onclick=load79;document.getElementById('r79').onclick=load79;document.getElementById('bMine').onclick=backToMine;
 
 /* ---------- Arranque ---------- */
 (async()=>{
