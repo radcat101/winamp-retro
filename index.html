@@ -828,13 +828,38 @@ function tickExtras(){
  if(sleepEnd){const left=(sleepEnd-Date.now())/1000;$id('sleepV').textContent='😴 '+fmt(Math.max(0,left));
   if(left<=30&&left>0){if(sleepVol===null)sleepVol=S.vol;S.vol=Math.round(sleepVol*left/30);applyVol()}
   if(left<=0){pause();sleepEnd=0;if(sleepVol!==null){S.vol=sleepVol;sleepVol=null;applyVol()}$id('sleepV').textContent='Apagado por temporizador'}}
- const now=Date.now();if(S.alarm.on&&now-alarmChk>5000){alarmChk=now;const d=new Date(),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),day=d.toDateString();
-  if(hm===S.alarm.t&&S.alarm.fired!==day){S.alarm.fired=day;save();S.vol=Math.max(S.vol,60);applyVol();E.vol.value=S.vol;
-   if(S.alarm.src==='fav'&&S.favs[0])playRadio(S.favs[0].url,S.favs[0]);else if(S.rhist[0]&&!curId)playRadio(S.rhist[0].url,S.rhist[0]);else resume();}}
+
 }
+function silentWav(sec){const n=Math.round(8000*sec),b=new ArrayBuffer(44+n*2),v=new DataView(b),w=(o,t)=>[...t].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+ w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,8000,true);v.setUint32(28,16000,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+ return URL.createObjectURL(new Blob([b],{type:'audio/wav'}))}
+const keepEl=new Audio();keepEl.loop=true;keepEl.setAttribute('playsinline','');
+function keepAlive(on){if(on){if(!keepEl.src)keepEl.src=silentWav(5);keepEl.play().catch(()=>{})}else keepEl.pause()}
+function alarmNext(){const[h,m]=S.alarm.t.split(':').map(Number),d=new Date(),t=new Date(d);t.setHours(h,m,0,0);if(t<=d||S.alarm.fired===d.toDateString()&&t.toDateString()===d.toDateString())t.setDate(t.getDate()+1);return t}
+async function fireAlarm(){
+ S.alarm.fired=new Date().toDateString();save();keepAlive(false);
+ S.vol=Math.max(S.vol,60);E.vol.value=S.vol;applyVol();
+ try{
+  if(S.alarm.src==='fav'&&S.favs[0])await playRadio(S.favs[0].url,S.favs[0]);
+  else if(curId&&lib[curId]&&!lib[curId].remote){const i=ci();await play(i>=0?i:0)}
+  else if(S.rhist[0])await playRadio(S.rhist[0].url,S.rhist[0]);
+  else if(tracks.length)await play(0);
+ }catch(e){}
+ $id('alarmV').textContent='⏰ ¡Alarma! '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+ renderAlarm();
+}
+setInterval(()=>{
+ if(!S.alarm.on)return;
+ const d=new Date(),[h,m]=S.alarm.t.split(':').map(Number),t=new Date(d);t.setHours(h,m,0,0);
+ const late=(d-t)/60000;
+ if(late>=0&&late<30&&S.alarm.fired!==d.toDateString())fireAlarm();
+ else{const nx=alarmNext(),mins=Math.round((nx-d)/60000);$id('alarmV').textContent='⏰ Suena en '+(mins>=60?Math.floor(mins/60)+' h '+(mins%60)+' min':mins+' min')+'. Deja la app abierta (puedes bloquear la pantalla si está activo 🔒).'}
+},5000);
+document.addEventListener('click',function armOnce(){if(S.alarm.on){initAudio();if(ctx)ctx.resume();primeAd();keepAlive(true)}document.removeEventListener('click',armOnce,true)},true);
 function renderAlarm(){$id('alarmT').value=S.alarm.t;$id('alarmSrc').value=S.alarm.src;$id('alarmOn').textContent=S.alarm.on?'⏰ Activa · Apagar':'Activar';$id('alarmOn').classList.toggle('on',S.alarm.on)}
-$id('alarmT').onchange=e=>{S.alarm.t=e.target.value;S.alarm.fired='';save()};$id('alarmSrc').onchange=e=>{S.alarm.src=e.target.value;save()};
-$id('alarmOn').onclick=()=>{S.alarm.on=!S.alarm.on;S.alarm.fired='';save();renderAlarm();if(S.alarm.on&&!ctx&&!S.bg)initAudio()};
+$id('alarmT').onchange=e=>{S.alarm.t=e.target.value;const d=new Date(),[h,m]=S.alarm.t.split(':').map(Number),t=new Date(d);t.setHours(h,m,0,0);S.alarm.fired=t<=d?d.toDateString():'';save()};$id('alarmSrc').onchange=e=>{S.alarm.src=e.target.value;save()};
+$id('alarmOn').onclick=()=>{S.alarm.on=!S.alarm.on;const d=new Date(),[h,m]=S.alarm.t.split(':').map(Number),t=new Date(d);t.setHours(h,m,0,0);S.alarm.fired=t<=d?d.toDateString():'';save();renderAlarm();
+ if(S.alarm.on){initAudio();if(ctx)ctx.resume();primeAd&&primeAd();decks.forEach(dk=>{if(!dk.el.src){dk.el.src=silentWav(.2);dk.el.play().then(()=>dk.el.pause()).catch(()=>{})}});keepAlive(true);$id('alarmV').textContent='⏰ Alarma activada para las '+S.alarm.t}else{keepAlive(false);$id('alarmV').textContent='Alarma apagada.'}};
 /* mi skin */
 const CV=[['--win1','Ventana'],['--tb2','Barra'],['--lcd1','Pantalla'],['--lcdtxt','Texto LCD'],['--acc','Acento'],['--edge','Bordes']];
 function applyTheme(){
