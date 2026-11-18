@@ -88,6 +88,8 @@ select,.inp{background:var(--btn1);color:var(--btntxt);border:2px solid var(--ed
 .stl img{width:24px;height:24px;border-radius:4px;object-fit:cover;background:#fff}
 .stl .n{flex:1;overflow:hidden}.stl .n b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stl .n small{opacity:.75}
 .stl button{background:none;border:none;color:inherit;font-size:16px;cursor:pointer}
+.lbl-pais{font:800 12px system-ui;color:#1b2550;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;white-space:nowrap;pointer-events:none;text-transform:uppercase;letter-spacing:1px}
+.lbl-edo{font:600 11px system-ui;color:#444;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap;pointer-events:none}
 .leaflet-popup-content button{margin-top:6px}
 #rRec{background:linear-gradient(#4a4a4a,#1f1f1f);color:#fff;border-color:#000}
 #rRec.rec{background:linear-gradient(#ff3b3b,#b00000);color:#fff;border-color:#600;animation:recb 1s steps(2) infinite}
@@ -488,7 +490,7 @@ async function playRadio(u,st){
   await radioEl.play();
  }catch(e){radioMsg('⚠️ Esta estación no respondió o está bloqueada. Prueba otra.');}
  const name=st?st.name.trim():u;
- setTitle('📻 '+name+(st&&st.state?' · '+st.state:'')+(st&&st.country?' · '+st.country:'')+'  ***');
+ setTitle('📻 '+name+(st&&st.state?' · '+st.state:'')+(st&&st.country?' · '+paisES(st):'')+'  ***');
  E.kbps.textContent=st&&st.bitrate?String(st.bitrate):'---';E.khz.textContent='--';E.chan.textContent=st&&st.codec?st.codec.slice(0,4):'LIVE';
  if('mediaSession' in navigator&&window.MediaMetadata)navigator.mediaSession.metadata=new MediaMetadata({title:name,artist:'Radio en vivo',album:st?st.country||'':'',artwork:st&&st.favicon?[{src:st.favicon}]:[]});
  if(st){radioHit(st);S.rhist=[st,...S.rhist.filter(x=>x.stationuuid!==st.stationuuid)].slice(0,30);save();renderHist();renderStations()}
@@ -498,7 +500,9 @@ function stopRadio(){if(radioOn){if(hls){hls.destroy();hls=null}radioEl.pause();
 
 /* ---------- Radio mundial (Radio Browser + mapa) ---------- */
 const MIRRORS=['https://de1.api.radio-browser.info','https://nl1.api.radio-browser.info','https://at1.api.radio-browser.info','https://de2.api.radio-browser.info'];
-let mirror=0,map=null,layer=null,stations=[],favView=false;
+let mirror=0,map=null,layer=null,lblP=null,lblE=null,stations=[],favView=false;
+const DN=(()=>{try{return new Intl.DisplayNames(['es'],{type:'region'})}catch(e){return null}})();
+const paisES=s=>{try{return s.countrycode&&DN?DN.of(s.countrycode.toUpperCase()):s.country}catch(e){return s.country}};
 async function rb(path,params={}){
  const qs=new URLSearchParams({hidebroken:'true',...params}).toString();
  for(let k=0;k<MIRRORS.length;k++){
@@ -512,10 +516,11 @@ function radioMsg(t){document.getElementById('rInfo').textContent=t}
 function initMap(){
  if(map||!window.L)return;
  map=L.map('map',{worldCopyJump:true,preferCanvas:true}).setView([23.6,-102.5],4);
- L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}).addTo(map);
- layer=L.layerGroup().addTo(map);
+ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+ layer=L.layerGroup().addTo(map);lblP=L.layerGroup().addTo(map);lblE=L.layerGroup();
+ map.on('zoomend',()=>{if(map.getZoom()>=5){map.addLayer(lblE)}else map.removeLayer(lblE)});
 }
-const slim=s=>({stationuuid:s.stationuuid,name:s.name,url:s.url_resolved||s.url,favicon:s.favicon,country:s.country,state:s.state,tags:s.tags,codec:s.codec,bitrate:s.bitrate,hls:s.hls,geo_lat:s.geo_lat,geo_long:s.geo_long});
+const slim=s=>({stationuuid:s.stationuuid,name:s.name,url:s.url_resolved||s.url,favicon:s.favicon,country:s.country,countrycode:s.countrycode,state:s.state,tags:s.tags,codec:s.codec,bitrate:s.bitrate,hls:s.hls,geo_lat:s.geo_lat,geo_long:s.geo_long});
 function showStations(list,msg,fly){
  favView=list===S.favs;
  stations=list.map(slim).filter(s=>s.url);
@@ -524,6 +529,11 @@ function showStations(list,msg,fly){
   layer.clearLayers();const pts=[];const acc=getComputedStyle(document.body).getPropertyValue('--acc').trim()||'#2b7cff';
   stations.forEach(s=>{if(s.geo_lat==null||s.geo_long==null)return;pts.push([s.geo_lat,s.geo_long]);
    L.circleMarker([s.geo_lat,s.geo_long],{radius:5,color:'#fff',weight:1,fillColor:acc,fillOpacity:.9}).bindTooltip(s.name).on('click',()=>playRadio(s.url,s)).addTo(layer)});
+  lblP.clearLayers();lblE.clearLayers();const gP={},gE={};
+  stations.forEach(s=>{if(s.geo_lat==null)return;const p=paisES(s)||'';if(p){(gP[p]=gP[p]||[]).push(s)}if(s.state){const k=p+'|'+s.state;(gE[k]=gE[k]||[]).push(s)}});
+  const avg=a=>[a.reduce((x,s)=>x+s.geo_lat,0)/a.length,a.reduce((x,s)=>x+s.geo_long,0)/a.length];
+  const lab=(g,cls,grp,name)=>Object.entries(g).forEach(([k,a])=>L.marker(avg(a),{interactive:false,icon:L.divIcon({className:cls,html:esc(name(k)),iconSize:null})}).addTo(grp));
+  lab(gP,'lbl-pais',lblP,k=>k);lab(gE,'lbl-edo',lblE,k=>k.split('|')[1]);
   if(fly&&pts.length)map.fitBounds(pts,{maxZoom:9,padding:[20,20]});
  }
  radioMsg(msg||`${stations.length} estaciones`);renderStations();
@@ -536,7 +546,7 @@ function renderStations(){
   li.innerHTML=`<img alt="" loading="lazy"><span class="n"><b></b><small></small></span>${favView&&i>0?'<button class="up" title="Subir">▲</button>':''}<button class="fv" title="Favorita">${fav?'⭐':'☆'}</button>`;
   const img=li.querySelector('img');if(s.favicon)img.src=s.favicon;img.onerror=()=>{img.style.visibility='hidden'};
   li.querySelector('b').textContent=s.name.trim();
-  li.querySelector('small').textContent=[s.state,s.country,(s.tags||'').split(',').slice(0,2).join(', '),s.bitrate?s.bitrate+'k':''].filter(Boolean).join(' · ');
+  li.querySelector('small').textContent=[s.state,paisES(s),(s.tags||'').split(',').slice(0,2).join(', '),s.bitrate?s.bitrate+'k':''].filter(Boolean).join(' · ');
   li.querySelector('.fv').onclick=e=>{e.stopPropagation();toggleFav(s);if(favView)showStations(S.favs,null,false)};
   const up=li.querySelector('.up');if(up)up.onclick=e=>{e.stopPropagation();const k=S.favs.findIndex(f=>f.stationuuid===s.stationuuid);if(k>0){[S.favs[k-1],S.favs[k]]=[S.favs[k],S.favs[k-1]];save();showStations(S.favs,null,false)}};
   li.onclick=()=>{playRadio(s.url,s);if(map&&s.geo_lat!=null)map.setView([s.geo_lat,s.geo_long],Math.max(map.getZoom(),7))};
@@ -820,7 +830,7 @@ $id('bImp').onclick=()=>$id('impIn').click();
 $id('impIn').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());if(!d.S)throw 0;const keep={order:S.order,cur:S.cur,pos:S.pos};S=Object.assign({},DEF,d.S,keep);localStorage.setItem('wr-state',JSON.stringify(S));alert('Respaldo importado.');location.reload()}catch(x){alert('Ese archivo no es un respaldo válido.')}};
 /* historial de radio */
 function renderHist(){const ul=$id('rHist');ul.innerHTML='';if(!S.rhist.length){ul.innerHTML='<li style="opacity:.6;cursor:default">Aún no escuchas radio.</li>';return}
- S.rhist.forEach(st=>{const li=document.createElement('li');li.innerHTML='<img alt=""><span class="n"><b></b><small></small></span>';const im=li.querySelector('img');if(st.favicon)im.src=st.favicon;im.onerror=()=>im.style.visibility='hidden';li.querySelector('b').textContent=st.name.trim();li.querySelector('small').textContent=[st.state,st.country].filter(Boolean).join(' · ');li.onclick=()=>playRadio(st.url,st);ul.append(li)})}
+ S.rhist.forEach(st=>{const li=document.createElement('li');li.innerHTML='<img alt=""><span class="n"><b></b><small></small></span>';const im=li.querySelector('img');if(st.favicon)im.src=st.favicon;im.onerror=()=>im.style.visibility='hidden';li.querySelector('b').textContent=st.name.trim();li.querySelector('small').textContent=[st.state,paisES(st)].filter(Boolean).join(' · ');li.onclick=()=>playRadio(st.url,st);ul.append(li)})}
 /* editar etiquetas */
 let editIdx=-1;
 function editTags(i){const t=tracks[i];if(!t)return;const ti=prompt('Título:',t.title||'');if(ti===null)return;const ar=prompt('Artista:',t.artist||'');if(ar===null)return;const al=prompt('Álbum:',t.album||'');if(al===null)return;
