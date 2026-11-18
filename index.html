@@ -99,6 +99,8 @@ body[data-theme=custom]{--win2:var(--win1)}
 .sec{font-size:12px;font-weight:800;margin-top:14px;letter-spacing:1px}
 #fullX{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid #fff;border-radius:999px;width:40px;height:40px;font-size:18px}
 #full .hint{position:absolute;top:calc(20px + env(safe-area-inset-top));left:0;right:0;text-align:center;color:rgba(255,255,255,.6);font:12px monospace}
+body.eco .marq span{animation:none;padding-left:0}
+body.eco .lcd:after{display:none}
 body.mini .xm{display:none!important}
 body.mini #app{max-width:460px}
 </style>
@@ -227,6 +229,8 @@ body.mini #app{max-width:460px}
   <div class="sec">🎨 MI SKIN</div>
   <div class="row" id="custVars"></div>
   <div class="row"><button class="btn sm" id="bgImg">🖼 Imagen de fondo</button><button class="btn sm" id="bgImgX">Quitar imagen</button></div>
+  <div class="sec">🔋 BATERÍA</div>
+  <div class="row"><label class="lab"><input type="checkbox" id="eco"> Ahorro de batería (apaga visualizador y animaciones)</label></div>
   <div class="sec">🔊 SONIDOS</div>
   <div class="row"><label class="lab"><input type="checkbox" id="clicks"> Clic retro al tocar los botones</label></div>
   <div class="sec">💾 RESPALDO</div>
@@ -257,7 +261,7 @@ const E={}; ['time','seek','st','viz','title','kbps','khz','chan','flags','pl','
 const dpr=Math.min(2,window.devicePixelRatio||1);
 const FREQS=[31,62,125,250,500,1000,2000,4000,8000,16000];
 const PRESETS={'Plano':[0,0,0,0,0,0,0,0,0,0],'Rock':[5,4,3,1,-1,-1,1,3,4,5],'Pop':[-1,1,3,4,3,0,-1,-1,0,1],'Bajo potente':[8,7,5,3,1,0,0,0,0,0],'Voz':[-2,-1,0,2,4,4,3,1,0,-1],'Clásica':[4,3,2,1,0,0,0,1,2,3],'Electrónica':[5,4,1,0,-2,1,0,1,4,5],'Agudos':[0,0,0,0,0,1,3,5,6,7],'Banda/Norteño':[3,4,2,0,1,2,3,2,1,0]};
-const DEF={order:[],cur:null,pos:{},bands:Array(10).fill(0),pre:0,eqOn:true,preset:'Plano',custom:{},theme:'plata',vol:80,bal:0,shuffle:false,repeat:'off',cf:0,speed:1,pitch:true,viz:0,lists:{},plays:{},secs:0,open:{wEq:true,wPl:true,wLrc:false,wVit:false,wRadio:false,wYT:false},favs:[],mini:false,remain:false,bg:null,rAd:0,yt:{url:'',i:0,n:0,every:5,ad:0},cust:{'--win1':'#2b2b3a','--lcd1':'#203a8f','--lcdtxt':'#eaf2ff','--acc':'#ff7a1a','--tb2':'#3a3a6a','--edge':'#000000'},bgImg:null,clicks:false,alarm:{t:'07:00',src:'last',on:false,fired:''},rhist:[],md:0};
+const DEF={order:[],cur:null,pos:{},bands:Array(10).fill(0),pre:0,eqOn:true,preset:'Plano',custom:{},theme:'plata',vol:80,bal:0,shuffle:false,repeat:'off',cf:0,speed:1,pitch:true,viz:0,lists:{},plays:{},secs:0,open:{wEq:true,wPl:true,wLrc:false,wVit:false,wRadio:false,wYT:false},favs:[],mini:false,remain:false,bg:null,eco:false,rAd:0,yt:{url:'',i:0,n:0,every:5,ad:0},cust:{'--win1':'#2b2b3a','--lcd1':'#203a8f','--lcdtxt':'#eaf2ff','--acc':'#ff7a1a','--tb2':'#3a3a6a','--edge':'#000000'},bgImg:null,clicks:false,alarm:{t:'07:00',src:'last',on:false,fired:''},rhist:[],md:0};
 let S; try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem('wr-state')||'{}'))}catch(e){S={...DEF}}
 const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 if(S.bg===null)S.bg=IOS;
@@ -692,7 +696,7 @@ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement
 E.full.onclick=e=>{if(e.target.id==='fullX'){setFull(false);return}S.md=(S.md+1)%3;save();const g=E.md.getContext('2d');g.fillStyle='#000';g.fillRect(0,0,E.md.width,E.md.height)};
 
 /* ---------- Bucle principal ---------- */
-let last=performance.now(),posT=0;
+let last=performance.now(),posT=0,lastDraw=0;
 function updFlags(){const f=[];if(S.speed!==1)f.push(S.speed.toFixed(2)+'×');if(S.cf)f.push('CF'+S.cf);if(abA!==null)f.push(abB!==null?'A↔B':'A-');if(S.shuffle)f.push('SHUF');if(S.repeat!=='off')f.push(S.repeat==='one'?'REP1':'REP');if(!S.eqOn)f.push('EQ OFF');E.flags.textContent=f.join(' ');E.bA.classList.toggle('on',abA!==null);E.bB.classList.toggle('on',abB!==null)}
 function loop(now){
  const dt=Math.min(.5,(now-last)/1000);last=now;const a=deck().el;
@@ -708,8 +712,12 @@ function loop(now){
   if(!seeking&&isFinite(d)&&d)E.seek.value=ct/d*1000;
   E.st.textContent=!a.paused?'▶':(a.currentTime>0?'❚❚':'■');
  }
- tickExtras();updFlags();drawViz();if(fullOn)drawMD();updLrc(a);
- requestAnimationFrame(loop);
+ tickExtras();updFlags();
+ const playing=isPlaying()||(yt&&ytReady&&(()=>{try{return yt.getPlayerState()===1}catch(e){return false}})());
+ const fps=fullOn?30:S.eco?0:playing?20:1;
+ if(fps&&now-lastDraw>=1000/fps){lastDraw=now;drawViz();if(fullOn)drawMD()}
+ updLrc(a);
+ if(playing||fullOn||sleepEnd||S.alarm.on)requestAnimationFrame(loop);else setTimeout(()=>requestAnimationFrame(loop),500);
 }
 
 /* ---------- Controles ---------- */
@@ -843,6 +851,7 @@ $id('bgIn').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)retur
 $id('bgImgX').onclick=()=>{S.bgImg=null;applyTheme();save()};
 /* clics retro */
 let clickCtx=null;
+$id('eco').onchange=e=>{S.eco=e.target.checked;document.body.classList.toggle('eco',S.eco);save()};
 $id('clicks').onchange=e=>{S.clicks=e.target.checked;save()};
 document.addEventListener('pointerdown',e=>{if(!S.clicks||!e.target.closest('.btn'))return;try{clickCtx=clickCtx||new (window.AudioContext||window.webkitAudioContext)();const o=clickCtx.createOscillator(),g=clickCtx.createGain(),t=clickCtx.currentTime;o.type='square';o.frequency.setValueAtTime(1400,t);o.frequency.exponentialRampToValueAtTime(500,t+.04);g.gain.setValueAtTime(.06,t);g.gain.exponentialRampToValueAtTime(.001,t+.05);o.connect(g).connect(clickCtx.destination);o.start(t);o.stop(t+.06)}catch(x){}},true);
 /* respaldo */
@@ -1029,7 +1038,7 @@ document.getElementById('b79').onclick=load79;document.getElementById('r79').onc
 
 /* ---------- Arranque ---------- */
 (async()=>{
- E.selTheme.value=S.theme;applyTheme();applyName();renderAlarm();renderHist();$id('clicks').checked=S.clicks;
+ E.selTheme.value=S.theme;applyTheme();applyName();renderAlarm();renderHist();$id('clicks').checked=S.clicks;$id('eco').checked=S.eco;document.body.classList.toggle('eco',S.eco);
  document.body.classList.toggle('mini',S.mini);
  E.vol.value=S.vol;E.bal.value=S.bal;E.speed.value=Math.round(S.speed*100);E.speedV.textContent=S.speed.toFixed(2)+'×';E.cf.value=S.cf;E.cfV.textContent=S.cf+' s';E.pitch.checked=S.pitch;document.getElementById('bgMode').checked=S.bg;if(S.bg){E.cf.disabled=true;E.bEqOn.title='Desactivado en modo pantalla bloqueada'}
  setShuf(S.shuffle);E.bRep.textContent=repTxt[S.repeat];E.bRep.classList.toggle('on',S.repeat!=='off');
