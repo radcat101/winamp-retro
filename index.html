@@ -828,21 +828,32 @@ $id('cIn').onchange=e=>{const f=e.target.files[0];e.target.value='';const t=trac
 let rec=null;
 $id('rRec').onclick=async()=>{
  const b=$id('rRec');
- if(rec){rec.ctrl.abort();return}
+ if(rec){rec.stop=true;rec.ctrl&&rec.ctrl.abort();return}
  if(!radioOn||!radioUrl)return radioMsg('Primero sintoniza una estación.');
  if(/\.m3u8/i.test(radioUrl)||(curSt&&curSt.hls==1))return radioMsg('Esta estación usa HLS y no se puede grabar.');
- const ctrl=new AbortController(),chunks=[];let size=0;const st=curSt;rec={ctrl};
- try{
-  const r=await fetch(radioUrl,{signal:ctrl.signal});if(!r.ok||!r.body)throw 0;
-  const type=r.headers.get('content-type')||'audio/mpeg';b.classList.add('on');b.textContent='⏹ 0 MB';
-  const rd=r.body.getReader();
-  try{for(;;){const{done,value}=await rd.read();if(done)break;chunks.push(value);size+=value.length;b.textContent='⏹ '+(size/1048576).toFixed(1)+' MB'}}catch(x){}
-  const ext=/aac|mp4/.test(type)?'aac':/ogg/.test(type)?'ogg':'mp3';
-  const name=((st&&st.name)||'radio').trim().replace(/[^\w\-áéíóúñ ]/gi,'').slice(0,40)+' '+new Date().toLocaleString('es-MX').replace(/[/:, ]+/g,'-')+'.'+ext;
-  if(size>0){download(new Blob(chunks,{type}),name);radioMsg('✅ Grabación lista: '+name)}
- }catch(x){radioMsg('⚠️ Esta estación no permite grabar desde el navegador. Prueba con otra.')}
+ const chunks=[],st=curSt,u=radioUrl,t0=Date.now();let size=0,type='audio/mpeg',fails=0,lock=null;
+ rec={stop:false,ctrl:null};
+ try{lock=await navigator.wakeLock.request('screen')}catch(x){}
+ b.classList.add('on');b.textContent='⏹ conectando…';
+ while(!rec.stop&&fails<15){
+  rec.ctrl=new AbortController();
+  try{
+   const r=await fetch(u,{signal:rec.ctrl.signal,cache:'no-store'});if(!r.ok||!r.body)throw 0;
+   type=r.headers.get('content-type')||type;
+   if(/mpegurl|scpls|x-pls|text\//i.test(type))throw 'pl';
+   const rd=r.body.getReader();
+   for(;;){const{done,value}=await rd.read();if(done)break;fails=0;chunks.push(value);size+=value.length;b.textContent='⏹ '+fmt((Date.now()-t0)/1000)+' · '+(size/1048576).toFixed(1)+' MB'}
+  }catch(x){if(x==='pl'){fails=99;break}if(size===0&&fails>=2)break}
+  if(!rec.stop){fails++;await new Promise(r=>setTimeout(r,800))}
+ }
+ try{lock&&lock.release()}catch(x){}
+ const ext=/aac|mp4/.test(type)?'aac':/ogg/.test(type)?'ogg':'mp3';
+ const name=((st&&st.name)||'radio').trim().replace(/[^\w\-áéíóúñ ]/gi,'').slice(0,40)+' '+new Date().toLocaleString('es-MX').replace(/[/:, ]+/g,'-')+'.'+ext;
+ if(size>2048){download(new Blob(chunks,{type}),name);radioMsg('✅ Grabación lista ('+fmt((Date.now()-t0)/1000)+'): '+name)}
+ else radioMsg(fails===99?'⚠️ Esta estación entrega una lista y no el audio directo; no se puede grabar.':'⚠️ Esta estación no permite grabar desde el navegador. Prueba con otra.');
  rec=null;b.classList.remove('on');b.textContent='⏺ Grabar';
 };
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&rec)radioMsg('⚠️ Grabando: no bloquees el teléfono ni cambies de app, o la grabación se corta.')});
 
 /* ---------- Radio SUTERM 79 (audios de la carpeta radio79 del repo) ---------- */
 let in79=false;
