@@ -518,7 +518,13 @@ function radioMsg(t){document.getElementById('rInfo').textContent=t}
 function initMap(){
  if(map||!window.L)return;
  map=L.map('map',{worldCopyJump:true,preferCanvas:true}).setView([23.6,-102.5],4);
- L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Mapa © Esri'}).addTo(map);
+ const TILES=[['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Mapa © Esri'}],
+  ['https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Mapa © Esri'}],
+  ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',{maxZoom:13,attribution:'Mapa © Esri'}],
+  ['https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap'}]];
+ let ti=0,tl=null,errs=0,oks=0;
+ const setTiles=()=>{if(tl)map.removeLayer(tl);errs=0;oks=0;tl=L.tileLayer(TILES[ti][0],TILES[ti][1]).addTo(map);tl.on('tileload',()=>oks++);tl.on('tileerror',()=>{errs++;if(errs>=4&&oks===0&&ti<TILES.length-1){ti++;setTiles()}})};
+ setTiles();
  layer=L.layerGroup().addTo(map);lblP=L.layerGroup().addTo(map);lblE=L.layerGroup();
  map.on('zoomend',()=>{if(map.getZoom()>=5){map.addLayer(lblE)}else map.removeLayer(lblE)});
 }
