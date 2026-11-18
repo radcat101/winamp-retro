@@ -487,8 +487,10 @@ async function playRadio(u,st){
    if(!window.Hls)await loadScript('https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js');
    hls=new Hls();hls.loadSource(u);hls.attachMedia(radioEl);
   }else radioEl.src=u;
-  await radioEl.play();
- }catch(e){radioMsg('⚠️ Esta estación no respondió o está bloqueada. Prueba otra.');}
+  try{await radioEl.play()}catch(e1){
+   if(location.protocol==='https:'&&/^http:/i.test(u)){radioEl.src=u.replace(/^http:/i,'https:');await radioEl.play()}else throw e1;
+  }
+ }catch(e){radioMsg(/^http:/i.test(u)&&location.protocol==='https:'?'⚠️ Esta estación transmite sin seguridad (http) y el iPhone la bloquea. Prueba otra.':'⚠️ Esta estación no respondió o está caída. Prueba otra.');}
  const name=st?st.name.trim():u;
  setTitle('📻 '+name+(st&&st.state?' · '+st.state:'')+(st&&st.country?' · '+paisES(st):'')+'  ***');
  E.kbps.textContent=st&&st.bitrate?String(st.bitrate):'---';E.khz.textContent='--';E.chan.textContent=st&&st.codec?st.codec.slice(0,4):'LIVE';
@@ -516,7 +518,7 @@ function radioMsg(t){document.getElementById('rInfo').textContent=t}
 function initMap(){
  if(map||!window.L)return;
  map=L.map('map',{worldCopyJump:true,preferCanvas:true}).setView([23.6,-102.5],4);
- L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:18,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Mapa © Esri'}).addTo(map);
  layer=L.layerGroup().addTo(map);lblP=L.layerGroup().addTo(map);lblE=L.layerGroup();
  map.on('zoomend',()=>{if(map.getZoom()>=5){map.addLayer(lblE)}else map.removeLayer(lblE)});
 }
