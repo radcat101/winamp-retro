@@ -11,8 +11,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="radcat101">
 <meta name="theme-color" content="#1d2b62">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{--page:#eef1f6;--win1:#eef1f6;--win2:#c3cad6;--edge:#1b2550;--tb1:#1d2b62;--tb2:#33478d;--tbtxt:#c9d4f2;--lcd1:#2156c9;--lcd2:#0d2c80;--lcdtxt:#eaf2ff;--dim:rgba(234,242,255,.35);--acc:#2b7cff;--btn1:#fff;--btn2:#c9ced8;--btntxt:#1b2550;--txt:#1b2550;--bar1:#9fd0ff;--bar2:#ffffff;--peak:#ffffff}
 body[data-theme=clasico]{--page:#15151c;--win1:#4a4a5c;--win2:#2b2b37;--edge:#000;--tb1:#20203a;--tb2:#3b3b6a;--tbtxt:#d8d8ff;--lcd1:#050505;--lcd2:#000;--lcdtxt:#28e028;--dim:rgba(40,224,40,.3);--acc:#e8c020;--btn1:#5c5c70;--btn2:#33333f;--btntxt:#e6e6f0;--txt:#e6e6f0;--bar1:#18c018;--bar2:#f03018;--peak:#d0d0d0}
@@ -81,7 +79,8 @@ select,.inp{background:var(--btn1);color:var(--btntxt);border:2px solid var(--ed
 #full canvas{width:100%;height:100%;display:block}
 #full .ft{position:absolute;left:0;right:0;bottom:24px;text-align:center;color:#fff;font:700 20px "Courier New",monospace;text-shadow:0 0 10px #000;letter-spacing:3px;text-transform:uppercase;padding:0 12px}
 #drop{position:fixed;inset:0;background:rgba(0,0,0,.6);color:#fff;display:none;align-items:center;justify-content:center;font-size:24px;font-weight:800;z-index:90;border:4px dashed #fff}
-#map{height:300px;border-radius:8px;border:2px solid var(--edge);margin-top:8px;background:#aad3df}
+#rCountries li .fl{font-size:22px;width:28px;text-align:center}
+#rCountries li .ct{opacity:.7;font-size:12px}
 .stl{list-style:none;margin:8px 0 0;padding:0;max-height:260px;overflow:auto;background:var(--lcd2);border-radius:8px;border:2px solid var(--edge);font-size:13px}
 .stl li{display:flex;gap:8px;align-items:center;padding:6px 8px;color:var(--lcdtxt);border-bottom:1px solid var(--dim);cursor:pointer}
 .stl li.cur{background:var(--acc);color:#fff}
@@ -196,8 +195,9 @@ body.mini #app{max-width:460px}
   <div class="row">
    <button class="btn sm" id="rMx">🇲🇽 México</button><button class="btn sm" id="rNear">📍 Cerca de mí</button><button class="btn sm" id="rTop">🔥 Mundo</button><button class="btn sm" id="rRnd">🎲 Aleatoria</button><button class="btn sm" id="r79">📢 Radio 79</button><button class="btn sm" id="rFav">⭐ Favoritas</button><button class="btn sm" id="rUrl">🔗 Enlace</button><button class="btn sm" id="rRec">⏺ Grabar</button>
   </div>
-  <div id="map"></div>
-  <div class="foot" id="rInfo">Toca un punto del mapa para escuchar.</div>
+  <div class="row" id="rNav"><button class="btn sm" id="rBack">🌎 Países</button><select id="rState" class="hidden"><option value="">Todos los estados</option></select><input class="inp grow" id="rcq" type="search" placeholder="Filtrar países…"></div>
+  <ul class="stl" id="rCountries"></ul>
+  <div class="foot" id="rInfo">Elige un país o usa los botones de arriba.</div>
   <ul class="stl" id="rList"></ul>
  </div>
 </section>
@@ -530,7 +530,7 @@ function initMap(){
 }
 const slim=s=>({stationuuid:s.stationuuid,name:s.name,url:s.url_resolved||s.url,favicon:s.favicon,country:s.country,countrycode:s.countrycode,state:s.state,tags:s.tags,codec:s.codec,bitrate:s.bitrate,hls:s.hls,geo_lat:s.geo_lat,geo_long:s.geo_long});
 function showStations(list,msg,fly){
- favView=list===S.favs;
+ favView=list===S.favs;showList();if(list!==stAll&&!(stAll.includes(list[0])))$id('rState').classList.add('hidden');
  stations=list.map(slim).filter(s=>s.url);
  initMap();
  if(layer){
@@ -563,7 +563,7 @@ function renderStations(){
 }
 function toggleFav(s){const i=S.favs.findIndex(f=>f.stationuuid===s.stationuuid);if(i>=0)S.favs.splice(i,1);else S.favs.push(s);save();renderStations()}
 async function rLoad(fn,loading){radioMsg(loading||'Buscando…');try{await fn()}catch(e){radioMsg('⚠️ No se pudo conectar a Radio Browser. Revisa tu internet.')}}
-document.getElementById('rMx').onclick=()=>rLoad(async()=>showStations(await rb('/json/stations/search',{countrycode:'MX',order:'clickcount',reverse:'true',limit:'600'}),null,true));
+document.getElementById('rMx').onclick=()=>openCountry({cc:'MX',es:'México'});
 document.getElementById('rTop').onclick=()=>rLoad(async()=>{const l=await rb('/json/stations/search',{has_geo_info:'true',order:'clickcount',reverse:'true',limit:'1500'});showStations(l,null,false);map&&map.setView([20,0],2)});
 document.getElementById('rRnd').onclick=()=>rLoad(async()=>{const l=await rb('/json/stations/search',{has_geo_info:'true',order:'random',limit:'1'});showStations(l,'🎲 Estación sorpresa',true);if(stations[0])playRadio(stations[0].url,stations[0])});
 document.getElementById('rFav').onclick=()=>showStations(S.favs,S.favs.length?`⭐ ${S.favs.length} favoritas`:'Aún no tienes favoritas: toca ☆ en cualquier estación.',true);
@@ -582,7 +582,7 @@ document.getElementById('rNear').onclick=()=>{
   showStations(l,`📍 ${l.length} estaciones a menos de 150 km`,true);
  }),()=>radioMsg('No diste permiso de ubicación. Prueba con 🇲🇽 México o busca tu ciudad.'),{timeout:10000});
 };
-document.querySelector('[data-w="wRadio"]').addEventListener('click',()=>{if(!document.getElementById('wRadio').classList.contains('hidden')){initMap();setTimeout(()=>map&&map.invalidateSize(),50);if(!stations.length)document.getElementById('rMx').click()}});
+document.querySelector('[data-w="wRadio"]').addEventListener('click',()=>{if(!document.getElementById('wRadio').classList.contains('hidden')){initMap();setTimeout(()=>map&&map.invalidateSize(),50);if(!stations.length&&!countries.length)loadCountries()}});
 
 function setTitle(s){E.title.textContent=s;E.title.style.animationDuration=Math.max(8,s.length*.32)+'s';E.fullT.textContent=s.replace(/\*+/g,'')}
 function showTrack(t){
@@ -876,6 +876,39 @@ $id('rRec').onclick=async()=>{
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&rec)radioMsg('⚠️ Grabando: no bloquees el teléfono ni cambies de app, o la grabación se corta.')});
 
+/* ---------- Lista de países ---------- */
+let countries=[],stAll=[];
+const flag=cc=>cc&&cc.length===2?String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt())):'🏳️';
+const nameES=cc=>{try{return DN?DN.of(cc.toUpperCase()):cc}catch(e){return cc}};
+async function loadCountries(){
+ if(countries.length)return renderCountries();
+ radioMsg('Cargando países…');
+ try{const l=await rb('/json/countries',{order:'name'});const m={};
+  l.forEach(c=>{const cc=(c.iso_3166_1||'').toUpperCase();if(cc.length!==2||!c.stationcount)return;m[cc]=(m[cc]||0)+c.stationcount});
+  countries=Object.entries(m).map(([cc,n])=>({cc,n,es:nameES(cc)})).sort((a,b)=>a.cc==='MX'?-1:b.cc==='MX'?1:a.es.localeCompare(b.es,'es'));
+  radioMsg(countries.length+' países · elige uno');renderCountries();
+ }catch(e){radioMsg('⚠️ No se pudo conectar a Radio Browser. Revisa tu internet.')}
+}
+function renderCountries(){
+ const ul=$id('rCountries'),q=$id('rcq').value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ ul.classList.remove('hidden');$id('rList').classList.add('hidden');$id('rState').classList.add('hidden');$id('rcq').classList.remove('hidden');$id('rBack').classList.add('hidden');
+ ul.innerHTML='';
+ countries.filter(c=>!q||c.es.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q)).forEach(c=>{
+  const li=document.createElement('li');li.innerHTML=`<span class="fl">${flag(c.cc)}</span><span class="n"><b></b></span><span class="ct">${c.n}</span>`;li.querySelector('b').textContent=c.es;
+  li.onclick=()=>openCountry(c);ul.append(li)});
+}
+function showList(){$id('rCountries').classList.add('hidden');$id('rList').classList.remove('hidden');$id('rcq').classList.add('hidden');$id('rBack').classList.remove('hidden')}
+async function openCountry(c){
+ showList();radioMsg('Buscando radios de '+c.es+'…');
+ try{stAll=await rb('/json/stations/search',{countrycode:c.cc,order:'clickcount',reverse:'true',limit:'800'});
+  const states=[...new Set(stAll.map(s=>(s.state||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  const sel=$id('rState');sel.innerHTML='<option value="">Todos los estados ('+stAll.length+')</option>'+states.map(x=>`<option>${esc(x)}</option>`).join('');sel.classList.toggle('hidden',!states.length);
+  showStations(stAll,flag(c.cc)+' '+c.es+' · '+stAll.length+' estaciones',false);
+ }catch(e){radioMsg('⚠️ No se pudo cargar. Revisa tu internet.')}
+}
+$id('rState').onchange=e=>{const v=e.target.value;const l=v?stAll.filter(s=>(s.state||'').trim()===v):stAll;showStations(l,(v||'Todos')+' · '+l.length+' estaciones',false)};
+$id('rcq').oninput=renderCountries;$id('rBack').onclick=loadCountries;
+
 /* ---------- Radio SUTERM 79 (audios de la carpeta radio79 del repo) ---------- */
 let in79=false;
 async function load79(){
@@ -910,7 +943,7 @@ document.getElementById('b79').onclick=load79;document.getElementById('r79').onc
  E.bEqOn.classList.toggle('on',S.eqOn);E.bEqOn.textContent=S.eqOn?'ON':'OFF';
  Object.entries(S.open).forEach(([id,o])=>{const w=document.getElementById(id);w&&w.classList.toggle('hidden',!o);const b=$(`[data-w="${id}"]`);b&&b.classList.toggle('on',o)});
  buildPresets();buildEq();renderLists();applyVol();
- if(S.open.wRadio){initMap();setTimeout(()=>map&&map.invalidateSize(),100);document.getElementById('rMx').click()}
+ if(S.open.wRadio)loadCountries();
  try{
   db=await openDB();const all=await dbAll();all.forEach(t=>lib[t.id]=t);
   tracks=S.order.map(id=>lib[id]).filter(Boolean);
