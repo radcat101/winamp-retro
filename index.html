@@ -962,12 +962,19 @@ async function ytAfter(counted){
  if(counted&&S.yt.every>0&&S.yt.n%S.yt.every===0&&ads.length){
   const a=ads[S.yt.ad%ads.length];S.yt.ad++;save();ytInAd=true;
   $id('ytAdBox').classList.remove('hidden');$id('ytAdName').textContent=a.name;setTitle('📢 AVISO: '+a.name+'  ***');
-  try{yt.stopVideo()}catch(e){}
-  adEl.src=a.url;adEl.volume=Math.pow(S.vol/100,2);adEl.play().catch(()=>adDone());
+  adEl.src=a.url;adEl.volume=Math.pow(S.vol/100,2);
+  adEl.play().then(()=>{try{yt.stopVideo()}catch(e){}}).catch(()=>{ytMsg('⚠️ El iPhone bloqueó el aviso. Toca ⏯ una vez para reactivarlo.');adDone()});
   return;
  }
  ytPlay(S.yt.i+1);
 }
+let adPrimed=false;
+function primeAd(){ // iPhone: desbloquear el reproductor de avisos con un toque del usuario
+ if(adPrimed)return;const n=4410,b=new ArrayBuffer(44+n*2),v=new DataView(b),w=(o,t)=>[...t].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+ w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,44100,true);v.setUint32(28,88200,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+ adEl.src=URL.createObjectURL(new Blob([b],{type:'audio/wav'}));adEl.play().then(()=>{adEl.pause();adPrimed=true}).catch(()=>{});
+}
+document.addEventListener('click',e=>{if(e.target.closest('#ytLoad,#ytPlay,#ytNext,#ytPrev,#rList,#rHist,#r79,#rRnd,#bPlay'))primeAd()},true);
 function adDone(){if(!ytInAd)return;ytInAd=false;ytBusy=false;$id('ytAdBox').classList.add('hidden');ytPlay(S.yt.i+1)}
 adEl.addEventListener('ended',adDone);adEl.addEventListener('error',adDone);
 $id('ytLoad').onclick=ytLoad;$id('ytNext').onclick=()=>{if(ytInAd){adEl.pause();adDone()}else{ytBusy=false;ytAfter(true)}};$id('ytPrev').onclick=()=>ytPlay(S.yt.i-1);
@@ -986,11 +993,11 @@ setInterval(async()=>{
  rAdT+=dt;if(rAdT<S.rAd*60)return;rAdT=0;
  const ads=await getAds();if(!ads.length)return;
  const a=ads[S.yt.ad%ads.length];S.yt.ad++;save();rAdOn=true;
- const u=radioUrl,st=curSt;radioEl.pause();
+ const u=radioUrl,st=curSt;
  setTitle('📢 AVISO: '+a.name+'  ***');radioMsg('📢 Aviso de la 79… la radio regresa en un momento');
  const back=()=>{adEl.removeEventListener('ended',back);adEl.removeEventListener('error',back);rAdOn=false;if(radioOn&&radioUrl===u){radioEl.src=u;radioEl.play().catch(()=>{});setTitle('📻 '+(st?st.name.trim():u)+'  ***');radioMsg('📻 De regreso a la radio')}};
  adEl.addEventListener('ended',back);adEl.addEventListener('error',back);
- adEl.src=a.url;adEl.volume=Math.pow(S.vol/100,2);adEl.play().catch(back);
+ adEl.src=a.url;adEl.volume=Math.pow(S.vol/100,2);adEl.play().then(()=>radioEl.pause()).catch(back);
 },1000);
 
 /* ---------- Radio SUTERM 79 (audios de la carpeta radio79 del repo) ---------- */
