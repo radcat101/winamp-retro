@@ -923,7 +923,7 @@ $id('rState').onchange=e=>{const v=e.target.value;const l=v?stAll.filter(s=>(s.s
 $id('rcq').oninput=renderCountries;$id('rBack').onclick=loadCountries;
 
 /* ---------- YouTube + avisos ---------- */
-let yt=null,ytReady=false,ytIds=[],ytAds=null,ytInAd=false;const adEl=new Audio();adEl.setAttribute('playsinline','');
+let yt=null,ytReady=false,ytIds=[],ytAds=null,ytInAd=false,ytBusy=false;const adEl=new Audio();adEl.setAttribute('playsinline','');
 function ytMsg(t){$id('ytInfo').textContent=t}
 function ytApi(){return new Promise(r=>{if(window.YT&&YT.Player)return r();window.onYouTubeIframeAPIReady=r;loadScript('https://www.youtube.com/iframe_api')})}
 function parseList(u){try{const x=new URL(u);return{list:x.searchParams.get('list'),v:x.searchParams.get('v')||(x.hostname.includes('youtu.be')?x.pathname.slice(1):null)}}catch(e){return{}}}
@@ -940,29 +940,36 @@ async function ytLoad(){
  S.yt.url=u;S.yt.i=0;S.yt.n=0;save();stop();ytMsg('Cargando…');getAds();
  await ytApi();
  const opts={list:p.list,listType:'playlist'};
- if(!yt){yt=new YT.Player('ytPlayer',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,modestbranding:1},events:{onReady:()=>{ytReady=true;p.list?yt.cuePlaylist(opts):(ytIds=[p.v],ytPlay(0))},onStateChange:ytState,onError:()=>{ytMsg('Este video no se puede reproducir fuera de YouTube; saltando…');setTimeout(()=>ytAfter(false),1200)}}})}
+ if(!yt){yt=new YT.Player('ytPlayer',{width:'100%',height:'100%',playerVars:{playsinline:1,rel:0,modestbranding:1},events:{onReady:()=>{ytReady=true;p.list?yt.cuePlaylist(opts):(ytIds=[p.v],ytPlay(0))},onStateChange:ytState,onError:()=>{ytMsg('Este video no se puede reproducir fuera de YouTube; saltando…');setTimeout(()=>{ytBusy=false;ytAfter(false)},1200)}}})}
  else if(p.list)yt.cuePlaylist(opts);else{ytIds=[p.v];ytPlay(0)}
 }
 function ytState(e){
  if(e.data===YT.PlayerState.CUED&&!ytIds.length){const l=yt.getPlaylist()||[];if(l.length){ytIds=l;ytMsg(l.length+' canciones · aviso cada '+(S.yt.every||'∞'));ytPlay(Math.min(S.yt.i,l.length-1))}}
- if(e.data===YT.PlayerState.ENDED&&!ytInAd)ytAfter(true);
- if(e.data===YT.PlayerState.PLAYING){if(radioOn||isPlaying())stop();const d=yt.getVideoData&&yt.getVideoData();if(d&&d.title){setTitle('▶ '+d.title+'  ***');ytMsg(`Canción ${S.yt.i+1} de ${ytIds.length}`+(S.yt.every?` · aviso en ${S.yt.every-(S.yt.n%S.yt.every)}`:''))}}
+ if(e.data===YT.PlayerState.ENDED&&!ytInAd&&!ytBusy)ytAfter(true);
+ if(e.data===YT.PlayerState.PLAYING){
+  if(ytInAd){yt.pauseVideo();return}
+  const vd=yt.getVideoData&&yt.getVideoData(),vid=vd&&vd.video_id;
+  if(ytIds.length&&vid&&vid!==ytIds[S.yt.i]){ // YouTube avanzó solo a la siguiente: detenerlo y decidir aviso
+   yt.pauseVideo();if(!ytBusy)ytAfter(true);return}
+  ytBusy=false;if(radioOn||isPlaying())stop();const d=yt.getVideoData&&yt.getVideoData();if(d&&d.title){setTitle('▶ '+d.title+'  ***');ytMsg(`Canción ${S.yt.i+1} de ${ytIds.length}`+(S.yt.every?` · aviso en ${S.yt.every-(S.yt.n%S.yt.every)}`:''))}}
 }
-function ytPlay(i){if(!ytIds.length)return;S.yt.i=(i+ytIds.length)%ytIds.length;save();yt.loadVideoById(ytIds[S.yt.i])}
+function ytPlay(i){if(!ytIds.length)return;ytBusy=true;S.yt.i=(i+ytIds.length)%ytIds.length;save();yt.loadVideoById(ytIds[S.yt.i])}
 async function ytAfter(counted){
+ if(ytBusy)return;ytBusy=true;try{yt.pauseVideo()}catch(e){}
  if(counted)S.yt.n++;save();
  const ads=await getAds();
  if(counted&&S.yt.every>0&&S.yt.n%S.yt.every===0&&ads.length){
   const a=ads[S.yt.ad%ads.length];S.yt.ad++;save();ytInAd=true;
   $id('ytAdBox').classList.remove('hidden');$id('ytAdName').textContent=a.name;setTitle('📢 AVISO: '+a.name+'  ***');
+  try{yt.stopVideo()}catch(e){}
   adEl.src=a.url;adEl.volume=Math.pow(S.vol/100,2);adEl.play().catch(()=>adDone());
   return;
  }
  ytPlay(S.yt.i+1);
 }
-function adDone(){ytInAd=false;$id('ytAdBox').classList.add('hidden');ytPlay(S.yt.i+1)}
+function adDone(){if(!ytInAd)return;ytInAd=false;ytBusy=false;$id('ytAdBox').classList.add('hidden');ytPlay(S.yt.i+1)}
 adEl.addEventListener('ended',adDone);adEl.addEventListener('error',adDone);
-$id('ytLoad').onclick=ytLoad;$id('ytNext').onclick=()=>{if(ytInAd){adEl.pause();adDone()}else ytAfter(true)};$id('ytPrev').onclick=()=>ytPlay(S.yt.i-1);
+$id('ytLoad').onclick=ytLoad;$id('ytNext').onclick=()=>{if(ytInAd){adEl.pause();adDone()}else{ytBusy=false;ytAfter(true)}};$id('ytPrev').onclick=()=>ytPlay(S.yt.i-1);
 $id('ytPlay').onclick=()=>{if(ytInAd){adEl.paused?adEl.play():adEl.pause();return}if(!yt)return ytLoad();yt.getPlayerState()===1?yt.pauseVideo():yt.playVideo()};
 $id('ytEvery').onchange=e=>{S.yt.every=+e.target.value;save()};
 $id('ytUrl').value=S.yt.url||'';$id('ytEvery').value=String(S.yt.every);
