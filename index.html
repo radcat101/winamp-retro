@@ -950,7 +950,9 @@ function ytState(e){
  if(e.data===YT.PlayerState.PLAYING){
   if(ytInAd){yt.pauseVideo();return}
   const vd=yt.getVideoData&&yt.getVideoData(),vid=vd&&vd.video_id;
-  if(ytIds.length&&vid&&vid!==ytIds[S.yt.i]){ // YouTube avanzó solo a la siguiente: detenerlo y decidir aviso
+  const vj=vid?ytIds.indexOf(vid):-1;
+  if(vj<0&&ytIds.length){return} // anuncio propio de YouTube u otro video: no contar
+  if(ytIds.length&&vj!==S.yt.i){ // YouTube avanzó solo a la siguiente: detenerlo y decidir aviso
    yt.pauseVideo();if(!ytBusy)ytAfter(true);return}
   ytBusy=false;if(radioOn||isPlaying())stop();const d=yt.getVideoData&&yt.getVideoData();if(d&&d.title){setTitle('▶ '+d.title+'  ***');ytMsg(`Canción ${S.yt.i+1} de ${ytIds.length}`+(S.yt.every?` · aviso en ${S.yt.every-(S.yt.n%S.yt.every)}`:''))}}
 }
