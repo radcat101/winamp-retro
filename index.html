@@ -89,6 +89,9 @@ select,.inp{background:var(--btn1);color:var(--btntxt);border:2px solid var(--ed
 .stl .n{flex:1;overflow:hidden}.stl .n b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stl .n small{opacity:.75}
 .stl button{background:none;border:none;color:inherit;font-size:16px;cursor:pointer}
 .leaflet-popup-content button{margin-top:6px}
+#rRec{background:linear-gradient(#4a4a4a,#1f1f1f);color:#fff;border-color:#000}
+#rRec.rec{background:linear-gradient(#ff3b3b,#b00000);color:#fff;border-color:#600;animation:recb 1s steps(2) infinite}
+@keyframes recb{50%{box-shadow:0 0 0 4px rgba(255,0,0,.45),0 0 18px rgba(255,0,0,.9)}}
 body.mini .btn{min-width:62px;height:62px;font-size:24px}
 body.mini .time{font-size:46px}
 body[data-theme=custom]{--win2:var(--win1)}
@@ -834,7 +837,7 @@ $id('rRec').onclick=async()=>{
  const chunks=[],st=curSt,u=radioUrl,t0=Date.now();let size=0,type='audio/mpeg',fails=0,lock=null;
  rec={stop:false,ctrl:null};
  try{lock=await navigator.wakeLock.request('screen')}catch(x){}
- b.classList.add('on');b.textContent='⏹ conectando…';
+ b.classList.add('rec');b.textContent='🔴 conectando…';
  while(!rec.stop&&fails<15){
   rec.ctrl=new AbortController();
   try{
@@ -842,7 +845,7 @@ $id('rRec').onclick=async()=>{
    type=r.headers.get('content-type')||type;
    if(/mpegurl|scpls|x-pls|text\//i.test(type))throw 'pl';
    const rd=r.body.getReader();
-   for(;;){const{done,value}=await rd.read();if(done)break;fails=0;chunks.push(value);size+=value.length;b.textContent='⏹ '+fmt((Date.now()-t0)/1000)+' · '+(size/1048576).toFixed(1)+' MB'}
+   for(;;){const{done,value}=await rd.read();if(done)break;fails=0;chunks.push(value);size+=value.length;b.textContent='🔴 REC '+fmt((Date.now()-t0)/1000)+' · '+(size/1048576).toFixed(1)+' MB'}
   }catch(x){if(x==='pl'){fails=99;break}if(size===0&&fails>=2)break}
   if(!rec.stop){fails++;await new Promise(r=>setTimeout(r,800))}
  }
@@ -851,7 +854,7 @@ $id('rRec').onclick=async()=>{
  const name=((st&&st.name)||'radio').trim().replace(/[^\w\-áéíóúñ ]/gi,'').slice(0,40)+' '+new Date().toLocaleString('es-MX').replace(/[/:, ]+/g,'-')+'.'+ext;
  if(size>2048){download(new Blob(chunks,{type}),name);radioMsg('✅ Grabación lista ('+fmt((Date.now()-t0)/1000)+'): '+name)}
  else radioMsg(fails===99?'⚠️ Esta estación entrega una lista y no el audio directo; no se puede grabar.':'⚠️ Esta estación no permite grabar desde el navegador. Prueba con otra.');
- rec=null;b.classList.remove('on');b.textContent='⏺ Grabar';
+ rec=null;b.classList.remove('rec');b.textContent='⏺ Grabar';
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&rec)radioMsg('⚠️ Grabando: no bloquees el teléfono ni cambies de app, o la grabación se corta.')});
 
